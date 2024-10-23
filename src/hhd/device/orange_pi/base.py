@@ -158,7 +158,7 @@ def controller_loop(
         capabilities={EC("EV_KEY"): [EC("BTN_MOUSE")]},
         btn_map=OPI_TOUCHPAD_BUTTON_MAP,
         axis_map=OPI_TOUCHPAD_AXIS_MAP,
-        aspect_ratio=1,
+        aspect_ratio=6/9,
         required=True,
     )
 
@@ -169,7 +169,7 @@ def controller_loop(
         capabilities={EC("EV_KEY"): [EC("BTN_MOUSE")]},
         btn_map=LEFT_TOUCHPAD_BUTTON_MAP,
         axis_map=LEFT_TOUCHPAD_AXIS_MAP,
-        aspect_ratio=1,
+        aspect_ratio=6/9,
         required=True,
     )
 
