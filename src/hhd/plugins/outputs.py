@@ -17,6 +17,8 @@ from ..controller.virtual.uinput import (
     TOUCHPAD_BUTTON_MAP,
     TOUCHPAD_CAPABILITIES,
     XBOX_ELITE_BUTTON_MAP,
+    LEFT_TOUCHPAD_BUTTON_MAP,
+    LEFT_TOUCHPAD_AXIS_MAP,
     UInputDevice,
 )
 from .plugin import is_steam_gamepad_running, open_steam_kbd
@@ -39,6 +41,7 @@ def get_outputs(
     rgb_zones: RgbZones = "mono",
     controller_disabled: bool = False,
     touchpad_enable: Literal["disabled", "gamemode", "always"] | None = None,
+    dual_touchpad: bool = False,
 ) -> tuple[Sequence[Producer], Sequence[Consumer], Mapping[str, Any]]:
     producers = []
     consumers = []
@@ -228,6 +231,19 @@ def get_outputs(
         )
         producers.append(d)
         consumers.append(d)
+        if dual_touchpad:
+            d = UInputDevice(
+                name="Handheld Daemon Left Touchpad",
+                phys="phys-hhd-left",
+                capabilities=TOUCHPAD_CAPABILITIES,
+                pid=HHD_PID_TOUCHPAD,
+                btn_map=LEFT_TOUCHPAD_BUTTON_MAP,
+                axis_map=LEFT_TOUCHPAD_AXIS_MAP,
+                output_timestamps=True,
+                ignore_cmds=True,
+            )
+            producers.append(d)
+            consumers.append(d)
         uses_touch = True
 
     return (
