@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 CLAW_SET_M1M2 = lambda a, btn: bytes(
     [0x0F, 0x00, 0x00, 0x3C, 0x21, 0x01, *a[btn], 0x05, 0x01, 0x00, 0x00, 0x12, 0x00]
 )
+CLAW_SET_XINPUT_M1M2 = lambda a, btn, b: bytes(
+    [0x0F, 0x00, 0x00, 0x3C, 0x21, 0x01, *a[btn], 0x01, b]
+)
 CLAW_SYNC_ROM = bytes([0x0F, 0x00, 0x00, 0x3C, 0x22])
 
 CLAW_SET_XINPUT = bytes([0x0F, 0x00, 0x00, 0x3C, 0x24, 0x01, 0x00])
@@ -57,6 +60,15 @@ KBD_PID = 0x0001
 BACK_BUTTON_DELAY = 0.1
 BUTTON_MIN_DELAY = 0.13
 
+XINPUT_MAP = {
+    "btn_a": 0x09,
+    "btn_b": 0x0A,
+    "key_inst": 0x7A,
+    "key_del": 0x7D,
+    "key_1": 0x40,
+    "key_esc": 0x32,
+}
+
 # 0211
 ADDR_0163 = {
     "rgb": [0x01, 0xFA],
@@ -70,6 +82,8 @@ ADDR_0166 = {
     "rgb": [0x02, 0x4A],
     "m1": [0x00, 0xBA],
     "m2": [0x01, 0x63],
+    "m1_xinput": [0x00, 0xBD],
+    "m2_xinput": [0x01, 0x66],
 }
 ADDR_DEFAULT = ADDR_0166
 
@@ -238,6 +252,16 @@ class ClawDInputHidraw(GenericGamepadHidraw):
             self.write(CLAW_SET_M1M2(self.addr or ADDR_DEFAULT, "m1"))
             time.sleep(0.5)
             self.write(CLAW_SET_M1M2(self.addr or ADDR_DEFAULT, "m2"))
+            time.sleep(0.5)
+            self.write(CLAW_SYNC_ROM)
+            time.sleep(0.5)
+            self.write(CLAW_SET_MSI)
+            time.sleep(2)
+        elif init:
+            time.sleep(0.3)
+            self.write(CLAW_SET_XINPUT_M1M2(self.addr or ADDR_DEFAULT, "m1_xinput", XINPUT_MAP["key_inst"]))
+            time.sleep(0.5)
+            self.write(CLAW_SET_XINPUT_M1M2(self.addr or ADDR_DEFAULT, "m2_xinput", XINPUT_MAP["key_del"]))
             time.sleep(0.5)
             self.write(CLAW_SYNC_ROM)
             time.sleep(0.5)
@@ -455,14 +479,26 @@ def controller_loop(
         btn_map=dconf.get("btn_mapping", MSI_CLAW_MAPPINGS),
     )
 
-    # Desktop detectors with dynamic grabbing
-    d_kbd_2 = DesktopDetectorEvdev(
+    d_kbd_2 = GenericGamepadEvdev(
         vid=[MSI_CLAW_VID],
         pid=[MSI_CLAW_XINPUT_PID, MSI_CLAW_DINPUT_PID],
+        capabilities={EC("EV_KEY"): [EC("KEY_DELETE"), EC("KEY_INSERT")]},
+        btn_map={
+            EC("KEY_DELETE"): "extra_l1",  # M2
+            EC("KEY_INSERT"): "extra_r1",  # M1
+        },
         required=False,
         grab=False,
-        capabilities={EC("EV_KEY"): [EC("KEY_ESC")]},
     )
+
+    # Desktop detectors with dynamic grabbing
+    # d_kbd_2 = DesktopDetectorEvdev(
+    #     vid=[MSI_CLAW_VID],
+    #     pid=[MSI_CLAW_XINPUT_PID, MSI_CLAW_DINPUT_PID],
+    #     required=False,
+    #     grab=False,
+    #     capabilities={EC("EV_KEY"): [EC("KEY_ESC")]},
+    # )
     d_mouse = DesktopDetectorEvdev(
         vid=[MSI_CLAW_VID],
         pid=[MSI_CLAW_XINPUT_PID, MSI_CLAW_DINPUT_PID],
@@ -578,9 +614,8 @@ def controller_loop(
                     pass
 
             # Detect if we are in desktop mode through events
-            desktop_mode = d_mouse.desktop or d_kbd_2.desktop
+            desktop_mode = d_mouse.desktop
             d_mouse.desktop = False
-            d_kbd_2.desktop = False
 
             if desktop_mode or (switch_to_dinput and start > switch_to_dinput):
                 logger.info(
