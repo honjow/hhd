@@ -53,7 +53,7 @@ DS5_EDGE_MIN_TIMESTAMP_INTERVAL = 1500
 MAX_IMU_SYNC_DELAY = 2
 
 LEFT_TOUCH_CORRECTION = correct_touchpad(
-    DS5_EDGE_TOUCH_WIDTH, DS5_EDGE_TOUCH_HEIGHT, 1, "left"
+    DS5_EDGE_TOUCH_WIDTH, DS5_EDGE_TOUCH_HEIGHT, 1, "left_full"
 )
 
 logger = logging.getLogger(__name__)

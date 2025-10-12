@@ -336,6 +336,8 @@ TouchpadCorrectionType = Literal[
     "contain_center",
     "left",
     "right",
+    "left_full",
+    "right_full",
     "center",
     "legos",
     "disabled",
@@ -384,6 +386,22 @@ def correct_touchpad(
                     y_mult=new_height,
                     y_ofs=(height - new_height),
                 )
+        case "left_full":
+            # Left half, full height (ignore aspect ratio, fill entire left half)
+            return TouchpadCorrection(
+                x_mult=width / 2,
+                x_ofs=0,
+                y_mult=height,
+                y_ofs=0,
+            )
+        case "right_full":
+            # Right half, full height (ignore aspect ratio, fill entire right half)
+            return TouchpadCorrection(
+                x_mult=width / 2,
+                x_ofs=width / 2,
+                y_mult=height,
+                y_ofs=0,
+            )
         case "center":
             if ratio > 1:
                 new_width = width / ratio
