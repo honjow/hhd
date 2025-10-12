@@ -56,7 +56,7 @@ def get_outputs(
     if touch_conf is not None:
         touchpad = touch_conf["mode"].to(str)
         if dual_touchpad:
-            correction = "right"
+            correction = "right_full"
         else:
             correction = touch_conf["controller.correction"].to(TouchpadCorrectionType)
         if touchpad in ("emulation", "controller"):
