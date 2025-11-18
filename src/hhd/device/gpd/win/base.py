@@ -14,6 +14,7 @@ from hhd.controller.physical.evdev import B as EC
 from hhd.controller.physical.evdev import GenericGamepadEvdev
 from hhd.controller.physical.hidraw import GenericGamepadHidraw
 from hhd.controller.physical.imu import CombinedImu, HrtimerTrigger
+from hhd.controller.virtual.uinput import UInputDevice
 from hhd.plugins import Config, Context, Emitter, get_gyro_state, get_outputs
 
 from .const import (
@@ -263,13 +264,14 @@ def controller_loop(
         # btn_map={EC("KEY_SYSRQ"): "extra_l1", EC("KEY_PAUSE"): "extra_r1"},
     )
 
+    grab_at = dconf.get("grab_at", True)
     d_kbd_2 = None
     if dconf.get("btn_mapping"):
         d_kbd_2 = GenericGamepadEvdev(
             vid=[KBD_VID],
             pid=[KBD_PID],
             required=False,
-            grab=False,
+            grab=grab_at,
             btn_map=dconf.get("btn_mapping"),
         )
 
@@ -328,6 +330,19 @@ def controller_loop(
             startselect_chord=conf.get("main_chords", "disabled"),
         )
 
+    d_volume_btn = UInputDevice(
+        name="Handheld Daemon Volume Keyboard",
+        phys="phys-hhd-vbtn",
+        capabilities={EC("EV_KEY"): [EC("KEY_VOLUMEUP"), EC("KEY_VOLUMEDOWN")]},
+        btn_map={
+            "key_volumeup": EC("KEY_VOLUMEUP"),
+            "key_volumedown": EC("KEY_VOLUMEDOWN"),
+        },
+        pid=KBD_PID,
+        vid=KBD_VID,
+        output_timestamps=True,
+    )
+
     REPORT_FREQ_MIN = 25
     REPORT_FREQ_MAX = 400
 
@@ -376,6 +391,8 @@ def controller_loop(
                 traceback.print_exc()
         if has_touchpad and d_params["uses_touch"]:
             prepare(d_touch)
+        if grab_at and d_kbd_2:
+            prepare(d_volume_btn)
         if d_kbd_2:
             prepare(d_kbd_2)
         for d in d_producers:
