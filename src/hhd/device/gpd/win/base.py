@@ -70,11 +70,13 @@ BACK_BUTTON_DELAY = 0.025
 LEFT_BUTTONS = {
     EC("KEY_SYSRQ"),
     EC("KEY_F20"),
+    EC("KEY_F14"), # Win5: LEFTCTRL + LEFTSHIFT + F14
 }
 
 RIGHT_BUTTONS = {
     EC("KEY_PAUSE"),
     EC("KEY_F21"),
+    EC("KEY_F15"), # Win5: F3 + F15
 }
 
 
