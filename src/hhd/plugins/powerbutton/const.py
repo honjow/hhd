@@ -96,6 +96,7 @@ SUPPORTED_DEVICES: Sequence[PowerButtonConfig] = [
         "Claw A8 BZ2EM",
         type="only_press",
     ),
+    PBC("Terrans Force Handle 5", "Handle 5"),
 ]
 
 

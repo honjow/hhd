@@ -14,7 +14,7 @@ from hhd.controller.physical.rgb import LedDevice, is_led_supported
 from hhd.controller.virtual.uinput import UInputDevice
 from hhd.plugins import Config, Context, Emitter, get_gyro_state, get_outputs
 
-from .const import BTN_MAPPINGS, DEFAULT_MAPPINGS, TECNO_RAW_INTERFACE_BTN_MAP
+from .const import BTN_MAPPINGS, DEFAULT_MAPPINGS, TECNO_RAW_INTERFACE_BTN_MAP, TERRANS_FORCE_RAW_INTERFACE_BTN_MAP
 
 FIND_DELAY = 0.1
 ERROR_DELAY = 0.3
@@ -32,6 +32,9 @@ TECNO_PID = 0x2001
 
 ZOTAC_VID = 0x1EE9
 ZOTAC_PID = 0x1590
+
+TERRANS_FORCE_VID = 0x2f24
+TERRANS_FORCE_PID = 0x0135
 
 KBD_VID = 0x0001
 KBD_PID = 0x0001
@@ -68,6 +71,8 @@ def plugin_run(
                     vid = TECNO_VID
                 case "zotac":
                     vid = ZOTAC_VID
+                case "terrans_force":
+                    vid = TERRANS_FORCE_VID
                 case _:
                     vid = GAMEPAD_VID
             found_device = bool(enumerate_evs(vid=vid))
@@ -141,8 +146,8 @@ def controller_loop(
 
     # Inputs
     d_xinput = GenericGamepadEvdev(
-        vid=[GAMEPAD_VID, TECNO_VID, ZOTAC_VID],
-        pid=[GAMEPAD_PID, TECNO_PID, ZOTAC_PID],
+        vid=[GAMEPAD_VID, TECNO_VID, ZOTAC_VID, TERRANS_FORCE_VID],
+        pid=[GAMEPAD_PID, TECNO_PID, ZOTAC_PID, TERRANS_FORCE_PID],
         # name=["Generic X-Box pad"],
         capabilities={EC("EV_KEY"): [EC("BTN_A")]},
         required=True,
@@ -234,7 +239,15 @@ def controller_loop(
                 btn_map=dconf.get("btn_mapping", BTN_MAPPINGS),
                 capabilities={EC("EV_KEY"): [EC("KEY_F17"), EC("KEY_F18")]},
             )
-
+        if dtype == "terrans_force":
+            d_kbd_2 = GenericGamepadHidraw(
+                vid=[TERRANS_FORCE_VID],
+                pid=[TERRANS_FORCE_PID],
+                usage_page=[0xFF00],
+                usage=[0x0001],
+                required=True,
+                btn_map=TERRANS_FORCE_RAW_INTERFACE_BTN_MAP,
+            )
         prepare(d_xinput)
         if motion and d_imu:
             start_imu = True

@@ -51,6 +51,18 @@ TECNO_RAW_INTERFACE_BTN_MAP: dict[int | None, dict[Button, BM]] = {
     }
 }
 
+TERRANS_FORCE_BTN_MAPPINGS = {
+    B("KEY_VOLUMEUP"): "key_volumeup",
+    B("KEY_VOLUMEDOWN"): "key_volumedown",
+    B("KEY_O"): "share", # LMETA + LCTRL + O (keyboard button)
+}
+
+TERRANS_FORCE_RAW_INTERFACE_BTN_MAP: dict[int | None, dict[Button, BM]] = {
+    0x02: {
+        "share": BM((8 << 3) + 7),
+    }
+}
+
 
 AYANEO_DEFAULT_MAPPINGS: dict[str, tuple[Axis, str | None, float, float | None]] = {
     "accel_x": ("accel_z", "accel", 1, None),
@@ -208,6 +220,13 @@ CONFS = {
         "btn_mapping": ZOTAC_ZONE_MAPPINGS,
         "type": "zotac",
         "display_gyro": False,
+    },
+    # Terrans Force Handle 5
+    "Handle 5": {
+        "name": "Terrans Force Handle 5",
+        "hrtimer": True,
+        "btn_mapping": TERRANS_FORCE_BTN_MAPPINGS,
+        "type": "terrans_force",
     },
 }
 
