@@ -39,6 +39,15 @@ BTN_MAPPINGS_NONTURBO: dict[int, Button] = {
     B("KEY_O"): "share",
 }
 
+# Apex-specific keyboard mappings — Home is KEY_G (not KEY_D on standard OXP)
+APEX_BTN_MAPPINGS: dict[int, Button] = {
+    B("KEY_VOLUMEUP"): "key_volumeup",
+    B("KEY_VOLUMEDOWN"): "key_volumedown",
+    B("KEY_G"): "mode",
+    B("KEY_O"): "keyboard",
+    B("KEY_LEFTALT"): "share",
+}
+
 ONEX_DEFAULT_CONF = {
     "hrtimer": True,
 }
@@ -92,7 +101,14 @@ CONFS = {
     "ONEXPLAYER F1L": OXP_F1_CONF,
     "ONEXPLAYER F1 OLED": OXP_F1_CONF,
     "ONEXPLAYER F1Pro": OXP_F1_CONF,
-    "ONEXPLAYER F1 EVA-02": OXP_F1_CONF,  # F1Pro variant
+    "ONEXPLAYER F1 EVA-02": OXP_F1_CONF,
+    "ONEXPLAYER APEX": {
+        "name": "ONEXPLAYER APEX",
+        **ONEX_DEFAULT_CONF,
+        "protocol": "hid_v2",
+        "apex": True,
+        "apex_intercept": True,
+    },
     # OXP 2
     "ONEXPLAYER 2": OXP_2_CONF,
     "ONEXPLAYER 2 ARP23": OXP_2_CONF,

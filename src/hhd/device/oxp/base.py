@@ -13,7 +13,7 @@ from hhd.controller.physical.imu import CombinedImu, HrtimerTrigger
 from hhd.controller.virtual.uinput import UInputDevice
 from hhd.plugins import Config, Context, Emitter, get_gyro_state, get_outputs
 
-from .const import BTN_MAPPINGS, BTN_MAPPINGS_NONTURBO, DEFAULT_MAPPINGS
+from .const import APEX_BTN_MAPPINGS, BTN_MAPPINGS, BTN_MAPPINGS_NONTURBO, DEFAULT_MAPPINGS
 from .hid_v1 import OxpHidraw
 from .hid_v2 import OxpHidrawV2
 from .serial import SerialDevice, get_serial
@@ -112,14 +112,24 @@ def plugin_run(
                         )
                     )
                 case "hid_v2":
-                    found_vendor = bool(
-                        enumerate_unique(
-                            vid=XFLY_VID,
-                            pid=XFLY_PID,
-                            usage_page=XFLY_PAGE,
-                            usage=XFLY_USAGE,
+                    if dconf.get("apex", False):
+                        found_vendor = bool(
+                            enumerate_unique(
+                                vid=X1_MINI_VID,
+                                pid=X1_MINI_PID,
+                                usage_page=X1_MINI_PAGE,
+                                usage=X1_MINI_USAGE,
+                            )
                         )
-                    )
+                    else:
+                        found_vendor = bool(
+                            enumerate_unique(
+                                vid=XFLY_VID,
+                                pid=XFLY_PID,
+                                usage_page=XFLY_PAGE,
+                                usage=XFLY_USAGE,
+                            )
+                        )
                 case "hid_v1_g1":
                     found_vendor = bool(
                         enumerate_unique(
@@ -251,7 +261,7 @@ class OxpAtKbd(GenericGamepadEvdev):
         return evs
 
 
-def find_vendor(prepare, turbo, protocol: str | None, secondary: bool, vibration: str | None):
+def find_vendor(prepare, turbo, protocol: str | None, secondary: bool, vibration: str | None, apex: bool = False, apex_intercept: bool = True):
     vibration_val = None
     if vibration is not None:
         if not isinstance(vibration, str) or not vibration.startswith("v"):
@@ -271,14 +281,29 @@ def find_vendor(prepare, turbo, protocol: str | None, secondary: bool, vibration
         secondary=secondary,
         vibration=vibration_val,
     )
-    d_hidraw_v2 = OxpHidrawV2(
-        vid=[XFLY_VID],
-        pid=[XFLY_PID],
-        usage_page=[XFLY_PAGE],
-        usage=[XFLY_USAGE],
-        turbo=turbo,
-        required=True,
-    )
+    if apex:
+        # Apex: vendor HID is 1A86:FE00 (X1_MINI), not 1A2C:B001 (XFLY)
+        # apex_v1=True enables full intercept mode — all gamepad input
+        # comes through vendor HID (sticks, triggers, buttons, back paddles)
+        # apex_v1=False enables face-buttons-only mode — just Home + QAM
+        d_hidraw_v2 = OxpHidrawV2(
+            vid=[X1_MINI_VID],
+            pid=[X1_MINI_PID],
+            usage_page=[X1_MINI_PAGE],
+            usage=[X1_MINI_USAGE],
+            turbo=turbo,
+            required=True,
+            apex_v1=apex_intercept,
+        )
+    else:
+        d_hidraw_v2 = OxpHidrawV2(
+            vid=[XFLY_VID],
+            pid=[XFLY_PID],
+            usage_page=[XFLY_PAGE],
+            usage=[XFLY_USAGE],
+            turbo=turbo,
+            required=True,
+        )
     d_hidraw_g1 = OxpHidraw(
         vid=[XFLY_VID],
         pid=[XFLY_PID],
@@ -390,13 +415,38 @@ def turbo_loop(
         controller_disabled=True,
     )
 
-    d_kbd_1 = OxpAtKbd(
-        vid=[KBD_VID],
-        pid=[KBD_PID],
-        required=False,
-        grab=True,
-        btn_map=BTN_MAPPINGS,
-    )
+    d_kbd_vol = None
+    if dconf.get("apex", False):
+        d_kbd_1 = OxpAtKbd(
+            vid=[X1_MINI_VID],
+            pid=[X1_MINI_PID],
+            required=False,
+            grab=True,
+            btn_map=APEX_BTN_MAPPINGS,
+            capabilities={EC("EV_KEY"): [EC("KEY_G")]},
+        )
+        # Apex volume buttons come from AT keyboard (0x0001:0x0001),
+        # not X1_MINI. Capture them separately so volume reversal works.
+        d_kbd_vol = GenericGamepadEvdev(
+            vid=[KBD_VID],
+            pid=[KBD_PID],
+            name=["AT Translated Set 2 keyboard"],
+            required=False,
+            grab=True,
+            btn_map={
+                EC("KEY_VOLUMEUP"): "key_volumeup",
+                EC("KEY_VOLUMEDOWN"): "key_volumedown",
+            },
+            capabilities={EC("EV_KEY"): [EC("KEY_VOLUMEUP")]},
+        )
+    else:
+        d_kbd_1 = OxpAtKbd(
+            vid=[KBD_VID],
+            pid=[KBD_PID],
+            required=False,
+            grab=True,
+            btn_map=BTN_MAPPINGS,
+        )
 
     share_reboots = False
     last_controller_check = 0
@@ -481,12 +531,16 @@ def turbo_loop(
             protocol=dconf.get("protocol", None),
             secondary=dconf.get("rgb_secondary", False),
             vibration=conf.get("vibration_strength", None),
+            apex=dconf.get("apex", False),
+            apex_intercept=dconf.get("apex_intercept", True),
         )
         d_vend_id = [id(d) for d in d_vend]
 
         for d in d_producers:
             prepare(d)
         prepare(d_kbd_1)
+        if d_kbd_vol is not None:
+            prepare(d_kbd_vol)
 
         logger.info(
             "Turbo only mode started, the turbo button of the device will still work."
@@ -604,13 +658,38 @@ def controller_loop(
     else:
         mappings = BTN_MAPPINGS_NONTURBO
 
-    d_kbd_1 = OxpAtKbd(
-        vid=[KBD_VID],
-        pid=[KBD_PID],
-        required=False,
-        grab=True,
-        btn_map=mappings,
-    )
+    d_kbd_vol = None
+    if dconf.get("apex", False):
+        d_kbd_1 = OxpAtKbd(
+            vid=[X1_MINI_VID],
+            pid=[X1_MINI_PID],
+            required=False,
+            grab=True,
+            btn_map=APEX_BTN_MAPPINGS,
+            capabilities={EC("EV_KEY"): [EC("KEY_G")]},
+        )
+        # Apex volume buttons come from AT keyboard (0x0001:0x0001),
+        # not X1_MINI. Capture them separately so volume reversal works.
+        d_kbd_vol = GenericGamepadEvdev(
+            vid=[KBD_VID],
+            pid=[KBD_PID],
+            name=["AT Translated Set 2 keyboard"],
+            required=False,
+            grab=True,
+            btn_map={
+                EC("KEY_VOLUMEUP"): "key_volumeup",
+                EC("KEY_VOLUMEDOWN"): "key_volumedown",
+            },
+            capabilities={EC("EV_KEY"): [EC("KEY_VOLUMEUP")]},
+        )
+    else:
+        d_kbd_1 = OxpAtKbd(
+            vid=[KBD_VID],
+            pid=[KBD_PID],
+            required=False,
+            grab=True,
+            btn_map=mappings,
+        )
     # Touchpad keyboard
     d_kbd_2 = GenericGamepadEvdev(
         vid=[0x6080],
@@ -686,6 +765,11 @@ def controller_loop(
     if motion:
         REPORT_FREQ_MAX = max(REPORT_FREQ_MAX, conf["imu_hz"].to(float))
 
+    # Apex intercept mode: all input comes through vendor HID at high rate.
+    # Match the native polling speed to avoid stick latency.
+    if dconf.get("apex_intercept", False):
+        REPORT_FREQ_MAX = max(REPORT_FREQ_MAX, 500)
+
     REPORT_DELAY_MAX = 1 / REPORT_FREQ_MIN
     REPORT_DELAY_MIN = 1 / REPORT_FREQ_MAX
 
@@ -707,6 +791,8 @@ def controller_loop(
             protocol=dconf.get("protocol", None),
             secondary=dconf.get("rgb_secondary", False),
             vibration=conf.get("vibration_strength", None),
+            apex=dconf.get("apex", False),
+            apex_intercept=dconf.get("apex_intercept", True),
         )
         d_vend_id = [id(d) for d in d_vend]
         if dconf.get("g1", False):
@@ -720,6 +806,8 @@ def controller_loop(
                 prepare(d_imu)
         prepare(d_volume_btn)
         prepare(d_kbd_1)
+        if d_kbd_vol is not None:
+            prepare(d_kbd_vol)
 
         for d in d_producers:
             prepare(d)
