@@ -58,8 +58,8 @@ TERRANS_FORCE_BTN_MAPPINGS = {
 }
 
 TERRANS_FORCE_RAW_INTERFACE_BTN_MAP: dict[int | None, dict[Button, BM]] = {
-    0x02: {
-        "share": BM((8 << 3) + 7),
+    None: {
+        "share": BM((9 << 3) + 7),
     }
 }
 
