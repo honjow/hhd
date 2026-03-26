@@ -14,13 +14,23 @@ logger.info(f"OXP hid_v2 loaded: {_PATCH_VERSION}")
 
 
 def gen_cmd(cid: int, cmd: bytes | list[int] | str, size: int = 64):
-    # Command: [idx, cid, 0x3f, *cmd, 0x3f, cid], idx is optional
+    """Generate a v2 HID command (0xFF framing, used for RGB)."""
     if isinstance(cmd, str):
         c = bytes.fromhex(cmd)
     else:
         c = bytes(cmd)
     base = bytes([cid, 0xFF, *c])
     return base + bytes([0] * (size - len(base)))
+
+
+def gen_cmd_v1(cid: int, cmd: bytes | list[int] | str, idx: int = 0x01, size: int = 64):
+    """Generate a v1 HID command (0x3F framing, used for B4/B2 button commands)."""
+    if isinstance(cmd, str):
+        c = bytes.fromhex(cmd)
+    else:
+        c = bytes(cmd)
+    base = bytes([cid, 0x3F, idx, *c])
+    return base + bytes([0] * (size - len(base) - 2)) + bytes([0x3F, cid])
 
 
 def gen_rgb_mode(mode: str):
@@ -49,7 +59,9 @@ def gen_rgb_mode(mode: str):
     return gen_cmd(0x07, [mc])
 
 
-gen_intercept = lambda enable: gen_cmd(0xB2, [0x03 if enable else 0x00, 0x01, 0x02])
+gen_intercept_v1 = lambda enable: gen_cmd_v1(
+    0xB2, [0x03 if enable else 0x00, 0x01, 0x02]
+)
 
 
 def gen_brightness(
@@ -84,13 +96,24 @@ OXP_BUTTONS = {
 
 
 INITIALIZE = [
-    # Report mode activation (B2 cycle) is handled by back_paddle.py
-    # using v1 framing which is confirmed working on the Apex.
-    # HHD just reads the resulting B2 events via produce().
+    # B4 page 1: standard button identity mapping (byte6=0x20)
+    gen_cmd_v1(
+        0xB4,
+        "0238200101010101000000020102000000030103000000040104000000050105000000060106000000070107000000080108000000090109000000",
+    ),
+    # B4 page 2: remaining buttons + M1→F14(0x67), M2→F13(0x66)
+    # Keyboard entry format: [btn_id, 0x02(kbd), 0x01, oxp_keycode, 0x00, 0x00]
+    gen_cmd_v1(
+        0xB4,
+        "02382002010a010a0000000b010b0000000c010c0000000d010d0000000e010e0000000f010f000000100110000000220201670000230201660000",
+    ),
+    # B2 ENABLE→DISABLE cycle to activate report mode (flag 0x80)
+    gen_intercept_v1(True),
+    gen_intercept_v1(False),
 ]
 
 INIT_DELAY = 4
-WRITE_DELAY = 0.05
+WRITE_DELAY = 0.25
 SCAN_DELAY = 1
 
 
@@ -232,8 +255,9 @@ class OxpHidrawV2(GenericGamepadHidraw):
                 logger.warning(f"OXP HID invalid command: {cmd.hex()}")
                 continue
 
-            if cid in (0xF5, 0xB8):
-                # Initialization (0xf5) and rgb (0xb8) command responses, skip
+            if cid in (0xF5, 0xB8, 0xB4):
+                # Initialization (0xf5), rgb (0xb8), and button mapping (0xb4)
+                # command responses, skip
                 continue
 
             if cid != 0xB2:
