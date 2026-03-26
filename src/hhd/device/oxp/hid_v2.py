@@ -64,6 +64,16 @@ gen_intercept_v1 = lambda enable: gen_cmd_v1(
 )
 
 
+def gen_vibration_v1(strength: int):
+    mode = 0x02 if strength == 0 else 0x01
+    set_cmd = (
+        [0x02, 0x38, 0x02, 0xE3, 0x39, 0xE3, 0x39, 0xE3, 0x39, mode, strength, strength, 0xE3, 0x39, 0xE3]
+        + [0x00] * 35
+        + [0x39, 0xE3, 0x39, 0xE3, 0xE3, 0x02, 0x04, 0x39, 0x39]
+    )
+    return gen_cmd_v1(0xB3, set_cmd)
+
+
 def gen_brightness(
     enabled: bool,
     brightness: Literal["low", "medium", "high"],
@@ -107,6 +117,8 @@ INITIALIZE = [
         0xB4,
         "02382002010a010a0000000b010b0000000c010c0000000d010d0000000e010e0000000f010f000000100110000000220201670000230201660000",
     ),
+    # B3 vibration intensity: set to max so Xbox gamepad rumble works
+    gen_vibration_v1(5),
     # B2 ENABLE→DISABLE cycle to activate report mode (flag 0x80)
     gen_intercept_v1(True),
     gen_intercept_v1(False),
